@@ -5,6 +5,7 @@ import logging
 import argparse
 import os
 from io import StringIO
+from datetime import datetime, timedelta
 from collections import Counter
 FORMAT = '[%(levelname)s] Row %(rownum)s,  Field %(field)s - %(message)s'
 logging.basicConfig(format=FORMAT)
@@ -22,7 +23,8 @@ opt_heads = [
     'EADGenreForm_tab', 'NotNotes', 'ObjectType', 'ConConditionDetails',
     'ConHandlingInstructions', 'EADPhysicalTechnical',
     'AdmPublishWebNoPassword', 'SecDepartment_tab', 'EADPreviousID_tab',
-    'EADDimensions', 'ConConditionStatus', 'EADScopeAndContent']
+    'EADDimensions', 'ConConditionStatus', 'EADScopeAndContent',
+    'EADSubject_tab', 'EADName_tab', 'EADGeographicName_tab']
 
 mult_heads = [
     'Multimedia', 'MulTitle', 'DetResourceType',
@@ -33,6 +35,13 @@ all_heads = man_heads+opt_heads
 holder_heads = [
     'LocHolderName', 'LocLocationType', 'LocStorageType',
     'LocHolderLocationRef.LocLocationCode']
+
+
+def from_excel_ordinal(ordinal, _epoch0=datetime(1899, 12, 31)):
+    if ordinal > 59:
+        ordinal -= 1  # Excel leap year bug, 1900 is not a leap year!
+    d = (_epoch0 + timedelta(days=ordinal)).replace(microsecond=0)
+    return(d.date().strftime("%d %B %Y"))
 
 
 class multimedia(dict):
@@ -171,7 +180,14 @@ class record(dict):
 
     def date_check(self):
         self.d = {'rownum': self.rownum}
-        if '/' in self.date or 'circa' in self.date.lower():
+        if self.date.isnumeric() and self.date != self.edate:
+            date = int(self.date)
+            self.d['field'] = 'EADUnitDate'
+            logger.warning(
+                'Excel mangled date: %s, should be %s',
+                self.date, from_excel_ordinal(date),
+                extra=self.d)
+        elif '/' in self.date or 'circa' in self.date.lower():
             self.d['field'] = 'EADUnitDate'
             logger.warning(
                 'Invalid date format: %s', self.date, extra=self.d)
