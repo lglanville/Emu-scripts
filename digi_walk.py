@@ -101,7 +101,7 @@ def list_items(directory, ext):
     return(item_list)
 
 
-def write_csv(rows):
+def write_csv(rows, fields):
     with open(args.csvfile, 'w', newline='') as e:
         writer = csv.DictWriter(e, fieldnames=fields)
         writer.writeheader()
@@ -135,4 +135,4 @@ if __name__ == '__main__':
             row = {'EADUnitID': k}
             add_fields(v, row)
             rows.append(row)
-        write_csv(rows)
+        write_csv(rows, fields)
