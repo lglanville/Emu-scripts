@@ -1,24 +1,27 @@
 from datetime import datetime
 import calendar
 import re
-import sys
 import argparse
 from pathlib import Path
 
 
-CIRCA = ['C.', 'c.', 'Circa']
 MONTHS = list(calendar.month_name)[1:]
 MONTHS.extend(list(calendar.month_abbr)[1:])
 MONTHGROUP = "(" + '|'.join([m for m in MONTHS]) + r")"
 MONTH_NUMS = [str(m) for m in list(range(1, 13, 1))]
 CIRCA = r"(c\.? ?|circa ?)?"
 FD_REGEX = re.compile(
-    r"(((\d{1,2})[ -]{1,3})?(\d{1,2}),? (" + '|'.join([m for m in MONTHS]) + r"),? (\d{2,4}))",
+    r"(((\d{1,2}) "+MONTHGROUP+"?[ -]{1,3})?(\d{1,2}),? " + MONTHGROUP + r",? (\d{2,4}))",
+    flags=re.IGNORECASE)
+FDREV_REGEX = re.compile(
+    r"(("+MONTHGROUP+" (\d{1,2})[ -]{1,3})?"+MONTHGROUP+" (\d{1,2}),? (\d{2,4}))",
     flags=re.IGNORECASE)
 DELIM_REGEX = re.compile(r"((\d{1,2})[/\.]("+ '|'.join([m for m in MONTH_NUMS]) + ")[-/\.](\d{2,4}))")
 MDELIM_REGEX = re.compile(r"("+CIRCA+"(" + '|'.join([m for m in MONTH_NUMS]) + ")[/\.](\d{2,4}))")
 MDATE_REGEX = MDATE_REGEX = re.compile("(("+CIRCA+MONTHGROUP+"[ -]{1,3})?"+CIRCA + MONTHGROUP + r",? (\d{2,4}))", flags=re.IGNORECASE)
 YEAR_REGEX = re.compile(r"("+CIRCA+"([12][567890]\d{2})('?s)?)", flags=re.IGNORECASE)
+DAYS = calendar.day_name[:]
+DAYS.extend(calendar.day_abbr[:])
 
 class circadate(datetime):
     """Class to express fudgy dates"""
@@ -94,12 +97,20 @@ class daterange(object):
             self.latestcolumn(circa_margin))
 
 
+def strip_days(text):
+    for day in DAYS:
+        text = text.replace(day, '')
+    return text
+
+
 def pull_dates(text, circa=False):
     """Extract all potential dates from a block of text and return a
     daterange object.
     """
     dates = []
     d, text = fdate_extract(text)
+    dates.extend(d)
+    d, text = fdaterev_extract(text)
     dates.extend(d)
     d, text = mdate_extract(text)
     dates.extend(d)
@@ -120,14 +131,44 @@ def fdate_extract(text):
     dates = []
     m = FD_REGEX.findall(text)
     for date in m:
-        dstring = f"{'0'*(2-len(date[3]))+date[3]} {date[4].title()} {date[5]}"
-        if len(date[4]) == 3:
+        dstring = f"{'0'*(2-len(date[4]))+date[4]} {date[5].title()} {date[6]}"
+        if len(date[5]) == 3:
             fstring = "%d %b %Y"
         else:
             fstring = "%d %B %Y"
         dates.append(circadate.strptime(dstring, fstring))
         if date[2] != '':
-            dstring = f"{'0'*(2-len(date[2]))+date[2]} {date[4].title()} {date[5]}"
+            if date[3] == '':
+                dstring = f"{'0'*(2-len(date[2]))+date[2]} {date[5].title()} {date[6]}"
+            else:
+                dstring = f"{'0'*(2-len(date[2]))+date[2]} {date[3].title()} {date[6]}"
+            if len(date[3]) == 3:
+                fstring = "%d %b %Y"
+            else:
+                fstring = "%d %B %Y"
+            dates.append(circadate.strptime(dstring, fstring))
+        text = text.replace(date[0], '')
+    return dates, text
+
+
+def fdaterev_extract(text):
+    """Extracts dates from text in the form of  January 1 1982, Jan 1, 1982,
+    etc"""
+    dates = []
+    m = FDREV_REGEX.findall(text)
+    for date in m:
+        dstring = f"{'0'*(2-len(date[5]))+date[5]} {date[4].title()} {date[6]}"
+        if len(date[4]) == 3:
+            fstring = "%d %b %Y"
+        else:
+            fstring = "%d %B %Y"
+        dates.append(circadate.strptime(dstring, fstring))
+        if date[3] != '':
+            dstring = f"{'0'*(2-len(date[3]))+date[3]} {date[2].title()} {date[6]}"
+            if len(date[3]) == 3:
+                fstring = "%d %b %Y"
+            else:
+                fstring = "%d %B %Y"
             dates.append(circadate.strptime(dstring, fstring))
         text = text.replace(date[0], '')
     return dates, text
@@ -221,17 +262,22 @@ def main(workbookpath, column='EADUnitDate', cmargin=5):
                 break
         if date_column is not None:
             ws.insert_cols(col_index+1, 3)
-            for cell in ws[date_column]:
+            ws.cell(1, col_index+1).value = 'EADUnitDate'
+            ws.cell(1, col_index+2).value = 'EADUnitDateEarliest'
+            ws.cell(1, col_index+3).value = 'EADUnitDateLatest'
+            for cell in ws[date_column][1:]:
                 if cell.value is not None:
                     if type(cell.value) == datetime:
                         date = cell.value
-                        daterange(circadate(date.year, date.month, date.day))
+                        dates = daterange(circadate(date.year, date.month, date.day))
                     else:
                         datestring = str(cell.value).replace('\n', ' ')
+                        datestring = strip_days(datestring)
                         dates = pull_dates(datestring)
                     if dates is not None:
                         cols = dates.columns(circa_margin=cmargin)
-                        print(f"Row {cell.row}: Converted", datestring, "->", *cols)
+                        ds = str(cell.value).replace('\n', ' ')
+                        print(f"Row {cell.row}: Converted", ds, "->", *cols)
                         ws.cell(cell.row, col_index+1).value = cols[0]
                         ws.cell(cell.row, col_index+2).value = cols[1]
                         ws.cell(cell.row, col_index+3).value = cols[2]
