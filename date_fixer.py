@@ -100,6 +100,9 @@ class daterange(object):
 def strip_days(text):
     for day in DAYS:
         text = text.replace(day, '')
+    while '  ' in text:
+        text = text.replace('  ', ' ')
+    text = text.replace(b'\xe2\x80\x93'.decode(), '-')
     return text
 
 
