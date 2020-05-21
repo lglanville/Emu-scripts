@@ -14,7 +14,7 @@ FD_REGEX = re.compile(
     r"(((\d{1,2}) "+MONTHGROUP+"?[ -]{1,3})?(\d{1,2}),? " + MONTHGROUP + r",? (\d{2,4}))",
     flags=re.IGNORECASE)
 FDREV_REGEX = re.compile(
-    r"(("+MONTHGROUP+" (\d{1,2})[ -]{1,3})?"+MONTHGROUP+" (\d{1,2}),? (\d{2,4}))",
+    r"(("+MONTHGROUP+" (\d{1,2})[ -,]{1,3})?"+MONTHGROUP+" (\d{1,2})([ -,]{1,3}(\d{1,2}))?,? (\d{2,4}))",
     flags=re.IGNORECASE)
 DELIM_REGEX = re.compile(r"((\d{1,2})[/\.]("+ '|'.join([m for m in MONTH_NUMS]) + ")[-/\.](\d{2,4}))")
 MDELIM_REGEX = re.compile(r"("+CIRCA+"(" + '|'.join([m for m in MONTH_NUMS]) + ")[/\.](\d{2,4}))")
@@ -157,15 +157,18 @@ def fdaterev_extract(text):
     dates = []
     m = FDREV_REGEX.findall(text)
     for date in m:
-        dstring = f"{'0'*(2-len(date[5]))+date[5]} {date[4].title()} {date[6]}"
+        dstring = f"{'0'*(2-len(date[5]))+date[5]} {date[4].title()} {date[8]}"
         if len(date[4]) == 3:
             fstring = "%d %b %Y"
         else:
             fstring = "%d %B %Y"
         dates.append(circadate.strptime(dstring, fstring))
+        if date[7] != '':
+            dstring = f"{'0'*(2-len(date[7]))+date[7]} {date[4].title()} {date[8]}"
+            dates.append(circadate.strptime(dstring, fstring))
         if date[3] != '':
-            dstring = f"{'0'*(2-len(date[3]))+date[3]} {date[2].title()} {date[6]}"
-            if len(date[3]) == 3:
+            dstring = f"{'0'*(2-len(date[3]))+date[3]} {date[2].title()} {date[8]}"
+            if len(date[2]) == 3:
                 fstring = "%d %b %Y"
             else:
                 fstring = "%d %B %Y"
