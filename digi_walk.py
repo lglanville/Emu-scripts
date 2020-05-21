@@ -76,6 +76,7 @@ def add_fields(i, row):
         newfields = {
             'MulMultiMediaRef_tab({}).Multimedia'.format(x): v,
             'MulMultiMediaRef_tab({}).DetResourceType'.format(x): '',
+            'MulMultiMediaRef_tab({}).MulTitle'.format(x): '',
             'MulMultiMediaRef_tab({}).DetSource'.format(x): i.item_number,
             'MulMultiMediaRef_tab({}).AdmPublishWebNoPassword'.format(x):
             args.publish}
@@ -128,7 +129,7 @@ if __name__ == '__main__':
             for k, v in items.items():
                 print(k)
                 print(", ".join(v.surrogates))
-        write_csv(rows)
+        write_csv(rows, fields)
     else:
         rows = []
         for k, v in items.items():

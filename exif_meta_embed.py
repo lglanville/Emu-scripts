@@ -3,7 +3,7 @@ import re
 import subprocess
 import sys
 import os
-
+from concurrent.futures import ThreadPoolExecutor
 
 def id_transform(number):
     r = re.split(r'[,_.-]', number)
@@ -16,23 +16,32 @@ def id_transform(number):
     return('.'.join(r))
 
 
-c = pyodbc.connect('DSN=Emu Catalogue', autocommit=True)
-cursor = c.cursor()
-id = re.compile(r'\d{4}[,_.-]\d{2,4}[,_.-]\d{1,5}')
-for root, _, files in os.walk(sys.argv[1]):
-    for file in files:
-        n = id.findall(file)
-        if len(n) == 1:
-            unitid = id_transform(n[0])
-            q = f"select * from ecatalog.csv as c where c.EADUnitID='{unitid}'"
-            cursor.execute(q)
-            r = cursor.fetchone()
-            subprocess.run([
-                "exiftool", f"-Title={r.EADUnitTitle}",
-                "-overwrite_original",
-                f"-Identifier=UMA:{r.EADUnitID}",
-                f"-Description={r.EADScopeAndContent}",
-                f"-Coverage={r.EADUnitDate}",
-                f"-usageterms={r.EADUseRestrictions}"
-                "CollectionName={University of Melbourne Archives,CollectionURI=http://archives.unimelb.edu.au/}",
-                os.path.join(root, file)])
+def embed(fpath, record):
+    print('Embedding meta in ', fpath)
+    subprocess.run([
+        "exiftool", f"-Title={record.EADUnitTitle}",
+        "-overwrite_original",
+        f"-Identifier=UMA:{record.EADUnitID}",
+        f"-Description={record.EADScopeAndContent}",
+        f"-Coverage={record.EADUnitDate}",
+        f"-usageterms={record.EADUseRestrictions}"
+        "CollectionName={University of Melbourne Archives,CollectionURI=http://archives.unimelb.edu.au/}",
+        fpath])
+
+
+def main(directory):
+    c = pyodbc.connect('DSN=Emu Catalogue', autocommit=True)
+    cursor = c.cursor()
+    id = re.compile(r'\d{4}[,_.-]\d{2,4}[,_.-]\d{1,5}')
+    with ThreadPoolExecutor() as ex:
+        for root, _, files in os.walk(sys.argv[1]):
+            for file in files:
+                ident = id.findall(file)
+                if len(ident) == 1:
+                    fpath = os.path.join(root, file)
+                    unitid = id_transform(ident[0])
+                    q = f"select * from ecatalog.csv as c where c.EADUnitID='{unitid}'"
+                    cursor.execute(q)
+                    record = cursor.fetchone()
+                    if record is not None:
+                        ex.submit(embed, *(fpath, record))
