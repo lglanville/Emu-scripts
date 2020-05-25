@@ -9,10 +9,24 @@ MONTHS = list(calendar.month_name)[1:]
 MONTHS.extend(list(calendar.month_abbr)[1:])
 MONTHGROUP = "(" + '|'.join([m for m in MONTHS]) + r")"
 MONTH_NUMS = [str(m) for m in list(range(1, 13, 1))]
+MONTHNUM_GROUP = "(" + '|'.join([m for m in MONTH_NUMS]) + ")"
+DAY = r"([0-3]?\d)"
+DELIM = "[ ,./]{1,3}"
+YEAR = r"([12][890]\d{2})"
 CIRCA = r"(c\.? ?|circa ?)?"
+
+DAY_RANGE_RE = re.compile('('+DAY+'?'+DELIM+DAY+DELIM+MONTHGROUP+DELIM+YEAR+')', flags=re.IGNORECASE)
+REV_DAY_RANGE_RE = re.compile('('+MONTHGROUP+'('+DELIM+DAY+')?'+DELIM+DAY+DELIM+YEAR+')', flags=re.IGNORECASE)
+MONTH_RANGE_RE = re.compile('(('+DAY+DELIM+MONTHGROUP+DELIM+')?'+DAY+DELIM+MONTHGROUP+DELIM+YEAR+')', flags=re.IGNORECASE)
+DELIM_RE = re.compile('('+DAY+DELIM+MONTHNUM_GROUP+DELIM+YEAR+')', flags=re.IGNORECASE)
+MDELIM_RE = re.compile('('+CIRCA+MONTHNUM_GROUP+DELIM+YEAR+')', flags=re.IGNORECASE)
+MONTH_RE = re.compile('('+CIRCA+'('+MONTHGROUP+DELIM+')?'+MONTHGROUP+DELIM+YEAR+')', flags=re.IGNORECASE)
+YEAR_RE = re.compile(r"("+CIRCA+YEAR+"(s)?)", flags=re.IGNORECASE)
+
 FD_REGEX = re.compile(
-    r"(((\d{1,2}) "+MONTHGROUP+"?[ -]{1,3})?(\d{1,2}),? " + MONTHGROUP + r",? (\d{2,4}))",
+    r"(((\d{1,2}) "+MONTHGROUP+"?[., ]{1,3})?(\d{1,2})[,. ]{1,2}?" + MONTHGROUP + r"[,-. ]{1,2}?(\d{2,4}))",
     flags=re.IGNORECASE)
+
 FDREV_REGEX = re.compile(
     r"(("+MONTHGROUP+" (\d{1,2})[ -,]{1,3})?"+MONTHGROUP+" (\d{1,2})([ -,]{1,3}(\d{1,2}))?,? (\d{2,4}))",
     flags=re.IGNORECASE)
@@ -111,15 +125,17 @@ def pull_dates(text, circa=False):
     daterange object.
     """
     dates = []
-    d, text = fdate_extract(text)
+    d, text = dayrange_extract(text)
     dates.extend(d)
-    d, text = fdaterev_extract(text)
+    d, text = reverse_dayrange_extract(text)
     dates.extend(d)
-    d, text = mdate_extract(text)
+    d, text = monthrange_extract(text)
     dates.extend(d)
-    d, text = delim_extract(text)
+    d, text = month_extract(text)
     dates.extend(d)
-    d, text = mdelim_extract(text)
+    d, text = delimited_extract(text)
+    dates.extend(d)
+    d, text = monthdelimited_extract(text)
     dates.extend(d)
     d, text = year_extract(text)
     dates.extend(d)
@@ -128,107 +144,105 @@ def pull_dates(text, circa=False):
         return daterange(*dates)
 
 
-def fdate_extract(text):
+def dayrange_extract(text):
     """Extracts dates from text in the form of  1 January 1982, 1 Jan, 1982,
     etc"""
     dates = []
-    m = FD_REGEX.findall(text)
-    for date in m:
-        dstring = f"{'0'*(2-len(date[4]))+date[4]} {date[5].title()} {date[6]}"
-        if len(date[5]) == 3:
+    matches = REV_DAY_RANGE_RE.findall(text)
+    for date in matches:
+        if len(date[3]) == 3:
             fstring = "%d %b %Y"
         else:
             fstring = "%d %B %Y"
+        dstring = f"{'0'*(2-len(date[1]))+date[1]} {date[3].title()} {date[4]}"
         dates.append(circadate.strptime(dstring, fstring))
-        if date[2] != '':
-            if date[3] == '':
-                dstring = f"{'0'*(2-len(date[2]))+date[2]} {date[5].title()} {date[6]}"
-            else:
-                dstring = f"{'0'*(2-len(date[2]))+date[2]} {date[3].title()} {date[6]}"
-            if len(date[3]) == 3:
-                fstring = "%d %b %Y"
-            else:
-                fstring = "%d %B %Y"
-            dates.append(circadate.strptime(dstring, fstring))
+        dstring = f"{'0'*(2-len(date[2]))+date[2]} {date[3].title()} {date[4]}"
+        dates.append(circadate.strptime(dstring, fstring))
         text = text.replace(date[0], '')
     return dates, text
 
 
-def fdaterev_extract(text):
-    """Extracts dates from text in the form of  January 1 1982, Jan 1, 1982,
-    etc"""
+def reverse_dayrange_extract(text):
+    """Extracts dates in  the form of jan 6 1978, aug 8-9 1876 etc."""
     dates = []
-    m = FDREV_REGEX.findall(text)
-    for date in m:
-        dstring = f"{'0'*(2-len(date[5]))+date[5]} {date[4].title()} {date[8]}"
-        if len(date[4]) == 3:
+    matches = REV_DAY_RANGE_RE.findall(text)
+    for date in matches:
+        if len(date[1]) == 3:
             fstring = "%d %b %Y"
         else:
             fstring = "%d %B %Y"
+        dstring = f"{'0'*(2-len(date[4]))+date[4]} {date[1].title()} {date[5]}"
         dates.append(circadate.strptime(dstring, fstring))
-        if date[7] != '':
-            dstring = f"{'0'*(2-len(date[7]))+date[7]} {date[4].title()} {date[8]}"
-            dates.append(circadate.strptime(dstring, fstring))
         if date[3] != '':
-            dstring = f"{'0'*(2-len(date[3]))+date[3]} {date[2].title()} {date[8]}"
-            if len(date[2]) == 3:
-                fstring = "%d %b %Y"
-            else:
-                fstring = "%d %B %Y"
+            dstring = f"{'0'*(2-len(date[3]))+date[3]} {date[1].title()} {date[4]}"
             dates.append(circadate.strptime(dstring, fstring))
-        text = text.replace(date[0], '')
+            text = text.replace(date[0], '')
     return dates, text
 
 
-def mdate_extract(text):
+def monthrange_extract(text):
     """Extracts dates from text in the form of  January 1982, Jan, 1982,
-    etc"""
+    aug-sep 1765 etc"""
     dates = []
-    m = MDATE_REGEX.findall(text)
-    for date in m:
-        circa = False
-        if date[4] != '':
-            circa = True
-        dstring = f"{date[5].title()} {date[6]}"
+    matches = MONTH_RANGE_RE.findall(text)
+    for date in matches:
         if len(date[5]) == 3:
-            fstring = "%b %Y"
+            fstring = "%d %b %Y"
         else:
-            fstring = "%B %Y"
-        dates.append(circadate.strptime(dstring, fstring, no_day=True, circa=circa))
+            fstring = "%d %B %Y"
+        dstring = f"{'0'*(2-len(date[4]))+date[4]} {date[5].title()} {date[6]}"
+        dates.append(circadate.strptime(dstring, fstring))
         if date[3] != '':
-            dstring = f"{date[3].title()} {date[6]}"
             if len(date[3]) == 3:
-                fstring = "%b %Y"
+                fstring = "%d %b %Y"
             else:
-                fstring = "%B %Y"
-            if date[2] != '':
-                circa = True
-            else:
-                circa = False
-            dates.append(circadate.strptime(dstring, fstring, no_day=True, circa=circa))
+                fstring = "%d %B %Y"
+            dstring = f"{'0'*(2-len(date[2]))+date[2]} {date[3].title()} {date[6]}"
+            dates.append(circadate.strptime(dstring, fstring))
         text = text.replace(date[0], '')
     return dates, text
 
 
-def delim_extract(text):
+def delimited_extract(text):
     """Extracts dates from text in the form of  1/1/1982, 1.1.1982 etc"""
     dates = []
-    m = DELIM_REGEX.findall(text)
-    for date in m:
+    matches = DELIM_RE.findall(text)
+    for date in matches:
         dates.append(circadate(int(date[3]), int(date[2]), int(date[1])))
         text = text.replace(date[0], '')
     return dates, text
 
 
-def mdelim_extract(text):
-    """Extracts dates from text in the form of  1/1982, 1.1982 etc"""
+def month_extract(text):
+
     dates = []
-    m = MDELIM_REGEX.findall(text)
-    for date in m:
+    matches = MONTH_RE.findall(text)
+    for date in matches:
         circa = False
         if date[1] != '':
             circa = True
-        dates.append(circadate(int(date[3]), int(date[2]), no_month=True, circa=circa))
+        if len(date[4]) == 3:
+            fstring = "%b %Y"
+        else:
+            fstring = "%B %Y"
+        dstring = f"{date[4].title()} {date[5]}"
+        dates.append(circadate.strptime(dstring, fstring, no_day=True, circa=circa))
+        if date[3] != '':
+            if len(date[3]) == 3:
+                fstring = "%b %Y"
+            else:
+                fstring = "%B %Y"
+            dstring = f"{date[3].title()} {date[5]}"
+            dates.append(circadate.strptime(dstring, fstring, no_day=True, circa=circa))
+        text = text.replace(date[0], '')
+    return dates, text
+
+
+def monthdelimited_extract(text):
+    dates = []
+    matches = MDELIM_RE.findall(text)
+    for date in matches:
+        dates.append(circadate(int(date[3]), int(date[2])))
         text = text.replace(date[0], '')
     return dates, text
 
