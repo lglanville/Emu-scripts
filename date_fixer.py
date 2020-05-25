@@ -12,30 +12,21 @@ MONTH_NUMS = [str(m) for m in list(range(1, 13, 1))]
 MONTHNUM_GROUP = "(" + '|'.join([m for m in MONTH_NUMS]) + ")"
 DAY = r"([0-3]?\d)"
 DELIM = "[ ,./]{1,3}"
+RDELIM = "[ ,./-]{1,3}"
 YEAR = r"([12][890]\d{2})"
 CIRCA = r"(c\.? ?|circa ?)?"
 
-DAY_RANGE_RE = re.compile('('+DAY+'?'+DELIM+DAY+DELIM+MONTHGROUP+DELIM+YEAR+')', flags=re.IGNORECASE)
-REV_DAY_RANGE_RE = re.compile('('+MONTHGROUP+'('+DELIM+DAY+')?'+DELIM+DAY+DELIM+YEAR+')', flags=re.IGNORECASE)
-MONTH_RANGE_RE = re.compile('(('+DAY+DELIM+MONTHGROUP+DELIM+')?'+DAY+DELIM+MONTHGROUP+DELIM+YEAR+')', flags=re.IGNORECASE)
+DAY_RANGE_RE = re.compile('('+DAY+'?'+RDELIM+DAY+DELIM+MONTHGROUP+DELIM+YEAR+')', flags=re.IGNORECASE)
+REV_DAY_RANGE_RE = re.compile('('+MONTHGROUP+'('+DELIM+DAY+')?'+RDELIM+DAY+DELIM+YEAR+')', flags=re.IGNORECASE)
+MONTH_RANGE_RE = re.compile('(('+DAY+DELIM+MONTHGROUP+RDELIM+')?'+DAY+DELIM+MONTHGROUP+DELIM+YEAR+')', flags=re.IGNORECASE)
 DELIM_RE = re.compile('('+DAY+DELIM+MONTHNUM_GROUP+DELIM+YEAR+')', flags=re.IGNORECASE)
 MDELIM_RE = re.compile('('+CIRCA+MONTHNUM_GROUP+DELIM+YEAR+')', flags=re.IGNORECASE)
-MONTH_RE = re.compile('('+CIRCA+'('+MONTHGROUP+DELIM+')?'+MONTHGROUP+DELIM+YEAR+')', flags=re.IGNORECASE)
+MONTH_RE = re.compile('('+CIRCA+'('+MONTHGROUP+RDELIM+')?'+MONTHGROUP+DELIM+YEAR+')', flags=re.IGNORECASE)
 YEAR_RE = re.compile(r"("+CIRCA+YEAR+"(s)?)", flags=re.IGNORECASE)
 
-FD_REGEX = re.compile(
-    r"(((\d{1,2}) "+MONTHGROUP+"?[., ]{1,3})?(\d{1,2})[,. ]{1,2}?" + MONTHGROUP + r"[,-. ]{1,2}?(\d{2,4}))",
-    flags=re.IGNORECASE)
-
-FDREV_REGEX = re.compile(
-    r"(("+MONTHGROUP+" (\d{1,2})[ -,]{1,3})?"+MONTHGROUP+" (\d{1,2})([ -,]{1,3}(\d{1,2}))?,? (\d{2,4}))",
-    flags=re.IGNORECASE)
-DELIM_REGEX = re.compile(r"((\d{1,2})[/\.]("+ '|'.join([m for m in MONTH_NUMS]) + ")[-/\.](\d{2,4}))")
-MDELIM_REGEX = re.compile(r"("+CIRCA+"(" + '|'.join([m for m in MONTH_NUMS]) + ")[/\.](\d{2,4}))")
-MDATE_REGEX = MDATE_REGEX = re.compile("(("+CIRCA+MONTHGROUP+"[ -]{1,3})?"+CIRCA + MONTHGROUP + r",? (\d{2,4}))", flags=re.IGNORECASE)
-YEAR_REGEX = re.compile(r"("+CIRCA+"([12][567890]\d{2})('?s)?)", flags=re.IGNORECASE)
 DAYS = calendar.day_name[:]
 DAYS.extend(calendar.day_abbr[:])
+
 
 class circadate(datetime):
     """Class to express fudgy dates"""
@@ -214,7 +205,6 @@ def delimited_extract(text):
 
 
 def month_extract(text):
-
     dates = []
     matches = MONTH_RE.findall(text)
     for date in matches:
@@ -251,7 +241,7 @@ def year_extract(text):
     """Extracts a year or decade from text in the form of 1982, c.1982, 1980s
     etc"""
     dates = []
-    m = YEAR_REGEX.findall(text)
+    m = YEAR_RE.findall(text)
     for date in m:
         circa = False
         if date[1] != '':
