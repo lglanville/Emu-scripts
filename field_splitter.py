@@ -8,12 +8,12 @@ def get_reader(path):
     return(reader)
 
 
-def split_fields(row, fieldname, heads, delim=None):
+def split_fields(row, fieldname, heads, delimiter=None):
     if row.get(fieldname) is not None:
         subjects = row.pop(fieldname).strip().splitlines()
-        if delim is not None:
+        if delimiter is not None:
             for sub in subjects:
-                new_subs = [s.strip('.') for s in sub.split(delim)]
+                new_subs = [s.strip('.') for s in sub.split(delimiter)]
                 subjects.remove(sub)
                 subjects.extend(new_subs)
         sub_heads = [f'{fieldname}({x})' for x in range(1, len(subjects)+1)]
@@ -23,6 +23,25 @@ def split_fields(row, fieldname, heads, delim=None):
         subjects = dict(zip(sub_heads, subjects))
         row.update(subjects)
     return row, heads
+
+
+def main(in_csv, out_csv, delimiter=None):
+    reader = get_reader(in_csv)
+    data = {'headings': reader.fieldnames, 'rows': []}
+    fields = [f for f in reader.fieldnames if f.endswith('_tab')]
+    for row in reader:
+        for field in fields:
+            row, heads = split_fields(
+                row, field, data['headings'], delimiter=delimiter)
+            data['headings'] = heads
+        data['rows'].append(row)
+    for field in fields:
+        if field in data['headings']:
+            data['headings'].remove(field)
+    with open(out_csv, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(f, data['headings'])
+        writer.writeheader()
+        writer.writerows(data['rows'])
 
 
 if __name__ == '__main__':
@@ -37,21 +56,4 @@ if __name__ == '__main__':
         'also split on that character')
 
     args = parser.parse_args()
-    reader = get_reader(args.input)
-    data = {'headings': reader.fieldnames, 'rows': []}
-    fields = [
-        'EADSubject_tab', 'EADName_tab', 'EADGeographicName_tab',
-        'EADLanguageOfMaterial_tab', 'EADLanguageCodeOfMaterial_tab']
-    for row in reader:
-        for field in fields:
-            row, heads = split_fields(
-                row, field, data['headings'], delim=args.delimiter)
-            data['headings'] = heads
-        data['rows'].append(row)
-    for field in fields:
-        if field in data['headings']:
-            data['headings'].remove(field)
-    with open(args.output, 'w', newline='', encoding='utf-8') as f:
-        writer = csv.DictWriter(f, data['headings'])
-        writer.writeheader()
-        writer.writerows(data['rows'])
+    main(args.input, args.output, delimiter=args.delimiter)
