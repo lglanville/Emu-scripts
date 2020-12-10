@@ -43,9 +43,12 @@ def get_filter_args(segments):
     return args
 
 
-def redact(file, redactions, input_args=None, output_args=None):
+def redact(file, redactions, input_args=None, output_args=None, outfile=None):
     file = Path(file)
-    outfile = Path(file.parent, file.stem + '.REDACTED' + file.suffix)
+    if outfile is None:
+        outfile = Path(file.parent, file.stem + '.REDACTED' + file.suffix)
+    else:
+        outfile = Path(outfile)
     if outfile.exists():
         outfile.unlink()
     segments = get_segments(redactions)
@@ -75,6 +78,9 @@ if __name__ == '__main__':
         '--redactions', '-r', nargs='+',
         help='start and end of redactions (in seconds or HH:MM:SS format)')
     parser.add_argument(
+        '--output', '-o',
+        help='output file. If omitted, creates new file in original directory')
+    parser.add_argument(
         '--inputargs', '-ia', nargs='+',
         help='additional input parameters for ffmpeg')
     parser.add_argument(
@@ -83,4 +89,6 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     redactions = [[conv_to_seconds(i) for i in r.split('-')] for r in args.redactions]
-    redact(args.input, redactions, input_args=args.inputargs, output_args=args.outputargs)
+    redact(
+        args.input, redactions, input_args=args.inputargs,
+        output_args=args.outputargs, outfile=args.outfile)
