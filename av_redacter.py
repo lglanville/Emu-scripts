@@ -3,6 +3,11 @@ from pathlib import Path
 import subprocess
 from datetime import timedelta
 
+INPUT_SAMMA_ARGS = ['-c:v', 'libopenjpeg']
+DEFAULT_OUTPUT_ARGS = [
+    '-r', '25', '-c:v', 'libx264', '-pix_fmt', 'yuv420p',
+    '-crf', '23', '-movflags', '+faststart', '-c:a', 'aac']
+
 
 def conv_to_seconds(tstring):
     'Converts a string of either a digit or a timecode into seconds.'
@@ -51,7 +56,7 @@ def get_filter_args(segments):
 def redact(file, redactions, input_args=None, output_args=None, outfile=None):
     file = Path(file)
     if outfile is None:
-        outfile = Path(file.parent, file.stem + '.REDACTED' + file.suffix)
+        outfile = Path(file.parent, file.stem + '.REDACTED' + '.mp4')
     else:
         outfile = Path(outfile)
     if outfile.exists():
@@ -70,14 +75,14 @@ def redact(file, redactions, input_args=None, output_args=None, outfile=None):
         for arg in input_args:
             i = args.index(str(outfile))
             args.insert(i, arg)
-    sp = subprocess.run(args, stdout=subprocess.PIPE)
-    print(sp.args)
+    print(args)
+    subprocess.run(args, stdout=subprocess.PIPE)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-        description='Simple wrappper script to redact a section from an AV '
-        'file using ffmpeg. Requires the ffmpeg executable to be on PATH')
+        description='Simple wrappper script to create a redacted mpeg4 file'
+        'using ffmpeg. Requires the ffmpeg executable to be on PATH')
     parser.add_argument('input', metavar='i', help='input av file')
     parser.add_argument(
         '--redactions', '-r', nargs='+',
@@ -86,14 +91,23 @@ if __name__ == '__main__':
         '--output', '-o',
         help='output file. If omitted, creates new file in original directory')
     parser.add_argument(
-        '--inputargs', '-ia', nargs='+',
-        help='additional input parameters for ffmpeg')
+        '--SAMMA', '-s', action='store_true',
+        help='Designates that the source is a SAMMA JPEG2000/MXF file')
     parser.add_argument(
-        '--outputargs', '-oa', nargs='+',
-        help='additional output parameters for ffmpeg')
+        '--crf',
+        help='crf value for ffmpeg. Default is 23, lower is higher quality')
 
     args = parser.parse_args()
     redactions = [[conv_to_seconds(i) for i in r.split('-')] for r in args.redactions]
-    redact(
-        args.input, redactions, input_args=args.inputargs,
-        output_args=args.outputargs, outfile=args.outfile)
+    if args.crf is not None:
+        i = DEFAULT_OUTPUT_ARGS.index('-crf')
+        DEFAULT_OUTPUT_ARGS.pop(i + 1)
+        DEFAULT_OUTPUT_ARGS.insert(i + 1, args.crf)
+    if args.SAMMA:
+        redact(
+            args.input, redactions, input_args=INPUT_SAMMA_ARGS,
+            output_args=DEFAULT_OUTPUT_ARGS, outfile=args.output)
+    else:
+        redact(
+            args.input, redactions,
+            output_args=DEFAULT_OUTPUT_ARGS, outfile=args.output)

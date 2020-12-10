@@ -26,27 +26,28 @@ def split_fields(row, fieldname, heads, delimiter=None):
 
 
 def main(in_csv, out_csv, delimiter=None):
-    reader = get_reader(in_csv)
-    data = {'headings': reader.fieldnames, 'rows': []}
-    fields = [f for f in reader.fieldnames if f.endswith('_tab')]
-    for row in reader:
+    with open(in_csv, encoding='utf-8-sig') as f:
+        reader = csv.DictReader(f)
+        data = {'headings': reader.fieldnames, 'rows': []}
+        fields = [f for f in reader.fieldnames if f.endswith('_tab')]
+        for row in reader:
+            for field in fields:
+                row, heads = split_fields(
+                    row, field, data['headings'], delimiter=delimiter)
+                data['headings'] = heads
+            data['rows'].append(row)
         for field in fields:
-            row, heads = split_fields(
-                row, field, data['headings'], delimiter=delimiter)
-            data['headings'] = heads
-        data['rows'].append(row)
-    for field in fields:
-        if field in data['headings']:
-            data['headings'].remove(field)
-    with open(out_csv, 'w', newline='', encoding='utf-8') as f:
-        writer = csv.DictWriter(f, data['headings'])
-        writer.writeheader()
-        writer.writerows(data['rows'])
+            if field in data['headings']:
+                data['headings'].remove(field)
+        with open(out_csv, 'w', newline='', encoding='utf-8-sig') as f:
+            writer = csv.DictWriter(f, data['headings'])
+            writer.writeheader()
+            writer.writerows(data['rows'])
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-        description='Split multi-value fields in Emu uplaod sheets')
+        description='Split multi-value table fields in Emu uplaod sheets')
     parser.add_argument('input', metavar='i', help='csv upload file')
     parser.add_argument('output', metavar='o', help='converted csv file')
     parser.add_argument(
