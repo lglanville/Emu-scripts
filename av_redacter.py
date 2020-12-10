@@ -53,7 +53,7 @@ def get_filter_args(segments):
     return args
 
 
-def redact(file, redactions, input_args=None, output_args=None, outfile=None):
+def make_access_file(file, redactions=None, input_args=None, output_args=None, outfile=None):
     file = Path(file)
     if outfile is None:
         outfile = Path(file.parent, file.stem + '.REDACTED' + '.mp4')
@@ -61,20 +61,20 @@ def redact(file, redactions, input_args=None, output_args=None, outfile=None):
         outfile = Path(outfile)
     if outfile.exists():
         outfile.unlink()
-    segments = get_segments(redactions)
-    filter_args = get_filter_args(segments)
-    args = [
-        'ffmpeg', '-i', str(file), '-filter_complex',
-        filter_args,
-        '-map', '[outv]', '-map', '[outa]', str(outfile)]
+    args = ['ffmpeg', '-i', str(file), str(outfile)]
+    if redactions is not None:
+        segments = get_segments(redactions)
+        filter = get_filter_args(segments)
+        filter_args = [
+            '-filter_complex', filter, '-map', '[outv]', '-map', '[outa]']
+        i = args.index(str(outfile))
+        args[i:i] = filter_args
     if input_args is not None:
-        for arg in input_args:
-            i = args.index('-i')
-            args.insert(i, arg)
+        i = args.index('-i')
+        args[i:i] = input_args
     if output_args is not None:
-        for arg in input_args:
-            i = args.index(str(outfile))
-            args.insert(i, arg)
+        i = args.index(str(outfile))
+        args[i:i] = output_args
     print(args)
     subprocess.run(args, stdout=subprocess.PIPE)
 
@@ -98,16 +98,16 @@ if __name__ == '__main__':
         help='crf value for ffmpeg. Default is 23, lower is higher quality')
 
     args = parser.parse_args()
-    redactions = [[conv_to_seconds(i) for i in r.split('-')] for r in args.redactions]
+    if args.redactions is not None:
+        args.redactions = [[conv_to_seconds(i) for i in r.split('-')] for r in args.redactions]
     if args.crf is not None:
         i = DEFAULT_OUTPUT_ARGS.index('-crf')
-        DEFAULT_OUTPUT_ARGS.pop(i + 1)
-        DEFAULT_OUTPUT_ARGS.insert(i + 1, args.crf)
+        DEFAULT_OUTPUT_ARGS[i + 1] = args.crf
     if args.SAMMA:
-        redact(
-            args.input, redactions, input_args=INPUT_SAMMA_ARGS,
+        make_access_file(
+            args.input, redactions=args.redactions, input_args=INPUT_SAMMA_ARGS,
             output_args=DEFAULT_OUTPUT_ARGS, outfile=args.output)
     else:
-        redact(
-            args.input, redactions,
+        make_access_file(
+            args.input, redactions=args.redactions,
             output_args=DEFAULT_OUTPUT_ARGS, outfile=args.output)
