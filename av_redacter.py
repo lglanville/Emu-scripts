@@ -5,6 +5,8 @@ from datetime import timedelta
 
 
 def conv_to_seconds(tstring):
+    'Converts a string of either a digit or a timecode into seconds.'
+    'Note ffmpeg supports timecodes, but have found it kind of buggy.'
     if tstring.isdigit():
         return(int(tstring))
     else:
@@ -14,6 +16,8 @@ def conv_to_seconds(tstring):
 
 
 def get_segments(redactions):
+    'Given a sequence of redactions, returns a list of tuples of timecodes of '
+    'unredacted segments.'
     redactions.sort()
     segments = []
     start = 0
@@ -27,6 +31,7 @@ def get_segments(redactions):
 
 
 def get_filter_args(segments):
+    'Constructs a string for -filter_complex'
     args = ''
     seg_num = 0
     for start, end in segments:
