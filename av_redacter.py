@@ -56,7 +56,7 @@ def get_filter_args(segments):
 def make_access_file(file, redactions=None, input_args=None, output_args=None, outfile=None):
     file = Path(file)
     if outfile is None:
-        outfile = Path(file.parent, file.stem + '.REDACTED' + '.mp4')
+        outfile = Path(file.parent, file.stem + '.access' + '.mp4')
     else:
         outfile = Path(outfile)
     if outfile.exists():
@@ -86,7 +86,7 @@ if __name__ == '__main__':
     parser.add_argument('input', metavar='i', help='input av file')
     parser.add_argument(
         '--redactions', '-r', nargs='+',
-        help='start and end of redactions (in seconds or HH:MM:SS format)')
+        help='start and end of any redactions (in seconds or HH:MM:SS format)')
     parser.add_argument(
         '--output', '-o',
         help='output file. If omitted, creates new file in original directory')
