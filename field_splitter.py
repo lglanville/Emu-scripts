@@ -3,8 +3,9 @@ import csv
 
 
 def get_reader(path):
-    f = open(path, encoding='utf-8')
+    f = open(path, encoding='utf-8-sig')
     reader = csv.DictReader(f)
+    print(reader.fieldnames)
     return(reader)
 
 
@@ -39,6 +40,7 @@ def main(in_csv, out_csv, delimiter=None):
         for field in fields:
             if field in data['headings']:
                 data['headings'].remove(field)
+        data['headings'].sort()
         with open(out_csv, 'w', newline='', encoding='utf-8-sig') as f:
             writer = csv.DictWriter(f, data['headings'])
             writer.writeheader()
