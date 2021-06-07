@@ -45,3 +45,7 @@ def main(directory):
                     record = cursor.fetchone()
                     if record is not None:
                         ex.submit(embed, *(fpath, record))
+
+
+if __name__ == '__main__':
+    main(sys.argv[1])
