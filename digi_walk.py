@@ -3,28 +3,7 @@ import csv
 import argparse
 import re
 
-parser = argparse.ArgumentParser(
-    description='Generate or update EMu upload csv for digital surrogates')
-parser.add_argument(
-    'directory', metavar='i', type=str, nargs='+',
-    help='the base directory for the surrogates')
-parser.add_argument(
-    '--csv', dest='csvfile', required=True,
-    help='output csv file or an existing EMu csv upload file without'
-    'multimedia columns')
-parser.add_argument(
-    '--ext', dest='extension', required=True, nargs='+',
-    help='file extension with dot of the surrogates for upload')
-parser.add_argument(
-    '--pub', dest='publish', default='no', choices=['yes', 'no'],
-    help='whether the surrogates should be published to the web'
-    '(default is no)')
-parser.add_argument(
-    '--unmatched', dest='unmatched', default=False,
-    action='store_true',
-    help='add additional matched items to the spreadsheet')
-
-fields = [
+FIELDS = [
     'ObjectType', 'EADLevelAttribute', 'EADUnitID',
     'AssParentObjectRef.EADUnitID',	'LocCurrentLocationRef.LocHolderName',
     'EADUnitTitle', 'EADUnitDate', 'EADUnitDateEarliest',
@@ -66,12 +45,9 @@ class item():
         s = self.pattern.findall(filepath)
         if len(s) > 0 and os.path.abspath(filepath) not in self.surrogates:
             self.surrogates.append(os.path.abspath(filepath))
-            return(1)
-        else:
-            return(0)
 
 
-def add_fields(i, row):
+def add_fields(i, row, publish='yes'):
     for x, v in enumerate(i.surrogates, start=1):
         newfields = {
             'MulMultiMediaRef_tab({}).Multimedia'.format(x): v,
@@ -79,7 +55,7 @@ def add_fields(i, row):
             'MulMultiMediaRef_tab({}).MulTitle'.format(x): '',
             'MulMultiMediaRef_tab({}).DetSource'.format(x): i.item_number,
             'MulMultiMediaRef_tab({}).AdmPublishWebNoPassword'.format(x):
-            args.publish}
+            publish}
         for field in newfields.keys():
             if field not in fields:
                 fields.append(field)
@@ -102,21 +78,20 @@ def list_items(directory, ext):
     return(item_list)
 
 
-def write_csv(rows, fields):
-    with open(args.csvfile, 'w', newline='') as e:
+def write_csv(csv_file, rows, fields):
+    with open(csv_file, 'w', newline='', encoding='utf-8-sig') as e:
         writer = csv.DictWriter(e, fieldnames=fields)
         writer.writeheader()
         for row in rows:
             writer.writerow(row)
 
 
-if __name__ == '__main__':
-    args = parser.parse_args()
+def main(directory, csv_file, publish='yes', exts=['.jpg', '.pdf']):
     items = {}
-    for dir in args.directory:
-        items.update(list_items(dir, args.extension))
-    if os.path.exists(args.csvfile):
-        with open(args.csvfile, newline='') as f:
+    for dir in directory:
+        items.update(list_items(dir, exts))
+    if os.path.exists(csv_file):
+        with open(csv_file, newline='', encoding='utf-8-sig') as f:
             reader = csv.DictReader(f)
             fields = reader.fieldnames
             rows = []
@@ -129,11 +104,36 @@ if __name__ == '__main__':
             for k, v in items.items():
                 print(k)
                 print(", ".join(v.surrogates))
-        write_csv(rows, fields)
+        write_csv(csv_file, rows, FIELDS)
     else:
         rows = []
         for k, v in items.items():
             row = {'EADUnitID': k}
-            add_fields(v, row)
+            add_fields(v, row, publish=publish)
             rows.append(row)
-        write_csv(rows, fields)
+        write_csv(csv_file, rows, fields)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        description='Generate or update EMu upload csv for digital surrogates')
+    parser.add_argument(
+        'directory', metavar='i', type=str, nargs='+',
+        help='the base directory for the surrogates')
+    parser.add_argument(
+        'csvfile',  metavar='o',
+        help='output csv file or an existing EMu csv upload file without'
+        'multimedia columns')
+    parser.add_argument(
+        '--extensions', '-e', nargs='+', default=['.jpg', '.pdf'],
+        help='file extension with dot of the surrogates for upload')
+    parser.add_argument(
+        '--pub', dest='publish', default='no', choices=['yes', 'no'],
+        help='whether the surrogates should be published to the web'
+        '(default is no)')
+    parser.add_argument(
+        '--unmatched', dest='unmatched', default=False,
+        action='store_true',
+        help='add additional matched items to the spreadsheet')
+    args = parser.parse_args()
+    main(args.directory, args.csvfile, publish=args.publish, exts=args.extensions)

@@ -39,11 +39,13 @@ def move_image(fpath, ident, page=1):
         new_dest = newpath / new_fname
         if not newpath.exists():
             newpath.mkdir(parents=True)
+        if not new_dest.exists():
             shutil.copy2(fpath, new_dest)
         else:
-            print(newpath, 'already exists')
+            print(new_dest, 'already exists')
     else:
         print('Invalid identifier:', ident)
+    print(fpath.name, '->', new_fname)
     return new_dest
 
 
@@ -51,8 +53,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Moves an image file into the UMA DAMstore and optionally'
         'creates an access JPEG')
-    parser.add_argument('input', metavar='i', help='csv upload file')
-    parser.add_argument('identifier', metavar='o', help='converted csv file')
+    parser.add_argument('identifier', metavar='o', help='unit id')
+    parser.add_argument('input', metavar='i', nargs='+',
+    help='image files. If multiple, they will be treated as pages incrementing in the order provided')
     parser.add_argument(
         '--jpeg', '-j',
         help='directory for jpegs')
@@ -61,6 +64,6 @@ if __name__ == '__main__':
         help='page number for multipage items')
 
     args = parser.parse_args()
-    newpath = move_image(args.input, args.identifier, page=args.page)
+    newpath = bulk_move(args.input, args.identifier, page=args.page)
     if args.jpeg is not None:
         jpeg(newpath, args.jpeg)
